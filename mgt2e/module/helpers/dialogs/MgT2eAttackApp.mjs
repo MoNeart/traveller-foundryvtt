@@ -4,7 +4,7 @@ import {getTraitValue, hasTrait, rollAttack, rollSpaceAttack} from "../dice-roll
 import {getAttackerTokens, getTargetData} from "../utils/combat-utils.mjs";
 import {formatRangeDMOption, getTargetRangeBand, getWeaponRangeBands, rebindTargetById, resolveRangeDM} from "../utils/range-utils.mjs";
 import {MGT2} from "../config.mjs";
-import {isCharacterAimingActor, parseAimingActions, resetAimingForTargetChange} from "../utils/attack-modifiers.mjs";
+import {AIMING_AUTO_WARNING, hasAimingAutoConflict, isCharacterAimingActor, parseAimingActions, resetAimingForTargetChange} from "../utils/attack-modifiers.mjs";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api
 const MANUAL_RANGE_DMS = new Set([1, 0, -2, -4]);
 
@@ -85,7 +85,7 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _getRangeDM(target) {
         const result = getTargetRangeBand(target.distanceMetres ?? target.distance, this.rangeBands, {
-            aimed: this.aimingActions > 0,
+            aimed: this.aimingActions > 0 && !["burst", "full"].includes(this.shotType),
             hasScope: hasTrait(this.weaponItem.system.weapon.traits, "scope")
         });
         if (result.band === "outOfRange") {
@@ -362,8 +362,8 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
             ui.notifications.warn("Aiming actions must be a whole number from 0 to 6.");
             return null;
         }
-        if (aimingActions > 0 && formData.object.shotType === "full") {
-            ui.notifications.warn("Aiming with Full Auto is not supported because one aim sequence cannot be assigned safely across multiple attacks.");
+        if (hasAimingAutoConflict(aimingActions, formData.object.shotType)) {
+            ui.notifications.warn(AIMING_AUTO_WARNING);
             return null;
         }
 

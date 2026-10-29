@@ -2,7 +2,7 @@ import {rollAttack, hasTrait, getTraitValue, skillLabel} from "../helpers/dice-r
 import {getSkillValue} from "../helpers/dice-rolls.mjs";
 import {getAttackerTokens} from "./utils/combat-utils.mjs";
 import {getWeaponRangeBands} from "./utils/range-utils.mjs";
-import {isCharacterAimingActor, parseAimingActions} from "./utils/attack-modifiers.mjs";
+import {AIMING_AUTO_WARNING, hasAimingAutoConflict, isCharacterAimingActor, parseAimingActions} from "./utils/attack-modifiers.mjs";
 
 export class MgT2AttackDialog extends Application {
     static get defaultOptions() {
@@ -269,8 +269,8 @@ export class MgT2AttackDialog extends Application {
                 return;
             }
         }
-        if (aimingActions > 0 && autoOption === "full") {
-            ui.notifications.warn("Aiming with Full Auto is not supported because one aim sequence cannot be assigned safely across multiple attacks.");
+        if (hasAimingAutoConflict(aimingActions, autoOption)) {
+            ui.notifications.warn(AIMING_AUTO_WARNING);
             return;
         }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {appendAimedModifier, isCharacterAimingActor, parseAimingActions, resetAimingForTargetChange} from "../mgt2e/module/helpers/utils/attack-modifiers.mjs";
+import {appendAimedModifier, hasAimingAutoConflict, isCharacterAimingActor, parseAimingActions, resetAimingForTargetChange} from "../mgt2e/module/helpers/utils/attack-modifiers.mjs";
 
 const actor = {type: "traveller"};
 
@@ -21,18 +21,28 @@ test("other firing modes receive no Aimed modifier", () => {
     assert.equal(appendAimedModifier("2D6", {autoOption: "aimed"}, weapon, actor), "2D6");
 });
 
-test("melee, spacecraft scale and Full Auto exclude aiming", () => {
+test("melee, spacecraft scale, Burst and Full Auto exclude aiming", () => {
     const melee = {system: {weapon: {range: 0, scale: "traveller"}}};
     const spacecraft = {system: {weapon: {range: 100, scale: "spacecraft"}}};
     const ranged = {system: {weapon: {range: 100, scale: "vehicle"}}};
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, melee, actor), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, spacecraft, actor), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2, autoOption: "full"}, ranged, actor), "2D6");
-    assert.equal(appendAimedModifier("2D6", {aimingActions: 2, autoOption: "burst"}, ranged, actor), "2D6 + 2[Aimed]");
+    assert.equal(appendAimedModifier("2D6", {aimingActions: 2, autoOption: "burst"}, ranged, actor), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, ranged, null), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, ranged, {type: "vehicle"}), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, {system: {weapon: {scale: "traveller"}}}, actor), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, {system: {weapon: {range: "invalid", scale: "traveller"}}}, actor), "2D6");
+});
+
+test("Auto conflict applies only to nonzero valid aim with Burst or Full Auto", () => {
+    for (const mode of ["burst", "full"]) {
+        assert.equal(hasAimingAutoConflict(0, mode), false);
+        assert.equal(hasAimingAutoConflict(1, mode), true);
+        assert.equal(hasAimingAutoConflict(6, mode), true);
+    }
+    assert.equal(hasAimingAutoConflict(6, "single"), false);
+    assert.equal(hasAimingAutoConflict("invalid", "burst"), false);
 });
 
 test("aiming action validation rejects fractional and out-of-range values", () => {

@@ -21,7 +21,8 @@ globalThis.game = {
     settings: {get: () => false}
 };
 globalThis.canvas = {tokens: {controlled: []}, grid: {size: 100, distance: 1}};
-globalThis.ui = {notifications: {warn: () => {}}};
+const warnings = [];
+globalThis.ui = {notifications: {warn: message => warnings.push(message)}};
 globalThis.window = globalThis;
 
 const {MgT2AttackDialog} = await import("../mgt2e/module/helpers/attack-dialog.mjs");
@@ -76,12 +77,12 @@ function weapon(range, scale = "traveller") {
     };
 }
 
-function htmlForAim(aimingActions) {
+function htmlForAim(aimingActions, autoOption = "single", DM = "0") {
     const values = new Map([
-        ["input[class='skillDialogDM']", [{value: "0"}]],
+        ["input[class='skillDialogDM']", [{value: DM}]],
         [".skillDialogRollType", [{value: "normal"}]],
         [".attackDialogRange", [{value: "0"}]],
-        [".attackDialogAuto", []],
+        [".attackDialogAuto", [{value: autoOption}]],
         [".attackDialogAiming", [{value: `${aimingActions}`}]],
         [".attackDialogPsi", []]
     ]);
@@ -98,6 +99,33 @@ test("legacy personal attack dialog renders fractional Short range", () => {
     assert.equal(dialog.RANGES["+1"], "MGT2.Attack.short (6.25m, +1)");
     assert.deepEqual(dialog.AIMING_ACTIONS, {0: "0", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6"});
     assert.equal(context.aimingActions, 0);
+});
+
+test("legacy handler allows aim-zero Auto modes and rejects aimed Auto before ammo or rolls", async () => {
+    for (const mode of ["burst", "full"]) {
+        formulas.length = 0;
+        warnings.length = 0;
+        const allowed = new MgT2AttackDialog(actor(), weapon(25));
+        allowed.close = () => {};
+        await allowed.onRollClick({preventDefault() {}}, htmlForAim(0, mode));
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(formulas.some(formula => formula.includes("2D6")), true);
+
+        formulas.length = 0;
+        const rejectedWeapon = weapon(25);
+        rejectedWeapon.useAmmo = () => true;
+        rejectedWeapon.updateCalls = 0;
+        rejectedWeapon.update = () => { rejectedWeapon.updateCalls += 1; };
+        const rejected = new MgT2AttackDialog(actor(), rejectedWeapon);
+        rejected.close = () => {};
+        const ammoBefore = rejectedWeapon.system.weapon.ammo;
+        await rejected.onRollClick({preventDefault() {}}, htmlForAim(1, mode, "2"));
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(formulas.length, 0);
+        assert.equal(rejectedWeapon.system.weapon.ammo, ammoBefore);
+        assert.equal(rejectedWeapon.updateCalls, 0);
+        assert.match(warnings.at(-1), /Auto trait/);
+    }
 });
 
 test("legacy melee dialog exposes no aiming actions", () => {

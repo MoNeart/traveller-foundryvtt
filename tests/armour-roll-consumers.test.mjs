@@ -28,6 +28,8 @@ globalThis.game = {
         get: (namespace, key) => namespace === "core" && key === "rollMode" ? "publicroll" : false
     }
 };
+const warnings = [];
+globalThis.ui = {notifications: {warn: message => warnings.push(message)}};
 globalThis.foundry = {
     applications: {
         handlebars: {renderTemplate: async () => "<p>roll</p>"},
@@ -224,10 +226,19 @@ test("rollAttack adds the selected aiming actions exactly once", async () => {
     await rollAttack(traveller(), weapon, {skillDM: 0, dm: 0, rangeDM: 0, rollType: "normal"});
     assert.doesNotMatch(formulas.at(-1), /\[Aimed\]/, "quick/default consumer calls use zero aiming actions");
 
-    formulas.length = 0;
-    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 0, rangeDM: 0, rollType: "normal", autoOption: "burst", aimingActions: 2, shotsFired: 2});
-    assert.equal(formulas.at(-1).match(/\[Aimed\]/g)?.length, 1);
-    assert.match(formulas.at(-1), /\+ 2\[Aimed\]/);
+    for (const mode of ["burst", "full"]) {
+        formulas.length = 0;
+        warnings.length = 0;
+        await rollAttack(traveller(), weapon, {skillDM: 0, dm: 3, rangeDM: 0, rollType: "normal", autoOption: mode, aimingActions: 0, shotsFired: 2});
+        assert.equal(formulas.some(formula => formula.includes("2D6")), true);
+        assert.match(formulas.find(formula => formula.includes("2D6")), /\+ 3\[DM\]/);
+
+        formulas.length = 0;
+        const result = await rollAttack(traveller(), weapon, {skillDM: 0, dm: 3, rangeDM: 0, rollType: "normal", autoOption: mode, aimingActions: 1, shotsFired: 2});
+        assert.equal(result, null);
+        assert.equal(formulas.length, 0);
+        assert.match(warnings.at(-1), /Auto trait/);
+    }
 });
 
 test("rollSpaceAttack applies armour only to an explicit character gunner", async () => {

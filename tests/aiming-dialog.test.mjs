@@ -82,16 +82,26 @@ test("melee, missing character and noncharacter Actor force aiming zero", async 
     assert.equal(vehicleActor.rolls[0].options.aimingActions, 0);
 });
 
-test("burst remains independent and Full Auto plus aiming is refused", async () => {
-    const burst = dialog();
-    await submit(burst, {aimingActions: "3", shotType: "burst"});
-    assert.equal(burst.rolls[0].options.autoOption, "burst");
-    assert.equal(burst.rolls[0].options.aimingActions, 3);
+test("Burst and Full Auto allow aim zero but reject nonzero aim before roll", async () => {
+    for (const mode of ["burst", "full"]) {
+        const allowed = dialog();
+        await submit(allowed, {aimingActions: "0", shotType: mode, DM: "2"});
+        assert.equal(allowed.rolls.length, 1);
+        assert.equal(allowed.rolls[0].options.autoOption, mode);
+        assert.equal(allowed.rolls[0].options.aimingActions, 0);
+        assert.equal(allowed.rolls[0].customDM, 2);
 
-    const full = dialog();
-    await submit(full, {aimingActions: "3", shotType: "full"});
-    assert.equal(full.rolls.length, 0);
-    assert.match(warnings.at(-1), /Full Auto/);
+        const aimedThenAuto = dialog();
+        await submit(aimedThenAuto, {aimingActions: "6", shotType: mode, DM: "2"});
+        assert.equal(aimedThenAuto.rolls.length, 0);
+        assert.match(warnings.at(-1), /Auto trait/);
+
+        const autoThenAimed = dialog();
+        autoThenAimed.shotType = mode;
+        autoThenAimed.aimingActions = 1;
+        await submit(autoThenAimed, {aimingActions: "1", shotType: mode});
+        assert.equal(autoThenAimed.rolls.length, 0);
+    }
 });
 
 test("actual constructor and reopened dialog state default to zero without persistence", () => {
@@ -180,4 +190,20 @@ test("actual context hides aiming for spacecraft scale even with a character act
     instance.weaponItem.system.weapon.scale = "spacecraft";
     const context = await instance._prepareContext({window: {}});
     assert.equal(context.canAim, false);
+});
+
+test("rejected Auto modes do not receive Scope aiming range benefit", () => {
+    const instance = preparedDialog();
+    instance.rangeBands = {
+        unit: "km",
+        metres: {short: 625, medium: 2500, long: 5000, extreme: 10000}
+    };
+    instance.aimingActions = 1;
+    const target = {distanceMetres: 2500};
+    instance.shotType = "single";
+    assert.equal(instance._getRangeDM({...target}), 0);
+    for (const mode of ["burst", "full"]) {
+        instance.shotType = mode;
+        assert.equal(instance._getRangeDM({...target}), -4);
+    }
 });

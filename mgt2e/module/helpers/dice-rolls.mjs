@@ -8,7 +8,7 @@
 
 import {MGT2} from "./config.mjs";
 import {appendArmourPenalty, getArmourSkillPenalty} from "./utils/armour-penalty.mjs";
-import {appendAimedModifier} from "./utils/attack-modifiers.mjs";
+import {AIMING_AUTO_WARNING, appendAimedModifier, hasAimingAutoConflict} from "./utils/attack-modifiers.mjs";
 import {getRangeBandDistance} from "./utils/range-utils.mjs";
 
 const { renderTemplate } = foundry.applications.handlebars;
@@ -149,6 +149,10 @@ export function printWeaponTraits(traits) {
 }
 
 export async function rollAttack(actor, weapon, attackOptions) {
+    if (hasAimingAutoConflict(attackOptions?.aimingActions, attackOptions?.autoOption)) {
+        ui.notifications.warn(AIMING_AUTO_WARNING);
+        return null;
+    }
     const   system = actor?actor.system:null;
     let     content = "Attack";
 
