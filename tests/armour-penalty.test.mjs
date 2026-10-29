@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {appendArmourPenalty, getArmourSkillPenalty} from "../mgt2e/module/helpers/utils/armour-penalty.mjs";
+import {appendArmourPenalty, buildTacticsInitiativeFormula, getArmourSkillPenalty} from "../mgt2e/module/helpers/utils/armour-penalty.mjs";
 
 const armour = (requirement, status = "equipped") => ({type: "armour", system: {status, armour: {skill: requirement}}});
 const actor = (skill, items = []) => ({system: {skills: {vaccsuit: skill}}, items});
@@ -55,4 +55,10 @@ test("armour penalty is independent of characteristic and physical burden", () =
     const traveller = actor({trained: true, value: 1}, [armour("2")]);
     assert.equal(appendArmourPenalty("2D6 + 1[SOC]", traveller), "2D6 + 1[SOC] - 1[Armour]");
     assert.equal(appendArmourPenalty("2D6 - 2[Enc]", traveller), "2D6 - 2[Enc] - 1[Armour]");
+});
+
+test("Tactics initiative formula applies armour only from the explicit crew Actor", () => {
+    const crew = actor({trained: true, value: 1}, [armour("2")]);
+    assert.equal(buildTacticsInitiativeFormula(2, crew), "2D6 - 8 + 2 - 1[Armour]");
+    assert.equal(buildTacticsInitiativeFormula(2, null), "2D6 - 8 + 2");
 });

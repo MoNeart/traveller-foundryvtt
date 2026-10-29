@@ -29,3 +29,7 @@ export function appendArmourPenalty(formula, actor) {
         : getArmourSkillPenalty(actor);
     return penalty === 0 ? formula : `${formula} - ${Math.abs(penalty)}[Armour]`;
 }
+
+export function buildTacticsInitiativeFormula(tacticsDM, actor) {
+    return appendArmourPenalty(`2D6 - 8 + ${tacticsDM}`, actor);
+}

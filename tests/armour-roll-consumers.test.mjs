@@ -21,7 +21,7 @@ class TestRoll {
 globalThis.Roll = TestRoll;
 globalThis.ChatMessage = {getSpeaker: () => ({})};
 globalThis.CONST = {ACTIVE_EFFECT_MODES: {ADD: 2}};
-globalThis.CONFIG = {MGT2: {WEAPONS: {traits: {}}}};
+globalThis.CONFIG = {MGT2: {WEAPONS: {traits: {}}, SPACE_MOUNTS: {}}};
 globalThis.game = {
     i18n: {localize: key => key},
     settings: {
@@ -35,7 +35,7 @@ globalThis.foundry = {
     }
 };
 
-const {rollAttack, rollSkill} = await import("../mgt2e/module/helpers/dice-rolls.mjs");
+const {rollAttack, rollSkill, rollSpaceAttack} = await import("../mgt2e/module/helpers/dice-rolls.mjs");
 const {dispatchSkillCheck} = await import("../mgt2e/module/helpers/utils/skill-roll-dispatch.mjs");
 
 function traveller() {
@@ -60,6 +60,7 @@ function traveller() {
         },
         items: [{type: "armour", system: {status: "equipped", armour: {skill: "2"}}}],
         getEffect: () => null,
+        getAttackSkill: () => 0,
         getRollData: () => ({})
     };
 }
@@ -136,6 +137,15 @@ test("mental and social checks apply armour without physical encumbrance", async
     assert.equal(formula.match(/\[Armour\]/g)?.length, 1);
 });
 
+test("characteristic-only rollSkill applies armour without a skill object", async () => {
+    formulas.length = 0;
+    await rollSkill(traveller(), null, {cha: "SOC", rollType: "normal", difficulty: 8});
+    const formula = formulas.at(-1);
+    assert.match(formula, /\+1\[SOC\]/);
+    assert.match(formula, /- 1\[Armour\]/);
+    assert.doesNotMatch(formula, /\[Enc\]/);
+});
+
 test("armour with no numeric requirement adds no armour term", async () => {
     const actor = traveller();
     actor.items[0].system.armour.skill = "-";
@@ -202,4 +212,23 @@ test("rollAttack adds Aimed exactly once and Single not at all", async () => {
     const single = formulas.find(formula => formula.includes("[Armour]"));
     assert.doesNotMatch(single, /\[Aimed\]/);
     assert.match(single, /\+ 1\[DM\]/);
+});
+
+test("rollSpaceAttack applies armour only to an explicit character gunner", async () => {
+    const starship = {name: "Test Ship", thumbnail: "ship.svg"};
+    const weapon = {
+        name: "Test Laser",
+        system: {tl: 10, damageType: "standard", weapon: {damage: "1D6", mount: "", traits: "", scale: "spacecraft"}},
+        hasTrait: () => false
+    };
+    const options = {results: {dice: "2D6", label: "Gunner", cha: "INT", chadm: 0, base: 0}, range: "medium", rangeDM: 0, quantity: 1};
+
+    formulas.length = 0;
+    await rollSpaceAttack(starship, traveller(), weapon, options);
+    const crewed = formulas.find(formula => formula.includes("[Armour]"));
+    assert.equal(crewed.match(/\[Armour\]/g)?.length, 1);
+
+    formulas.length = 0;
+    await rollSpaceAttack(starship, null, weapon, {...options, attackDM: 0});
+    assert.equal(formulas.some(formula => formula.includes("[Armour]")), false);
 });

@@ -673,6 +673,7 @@ export async function rollSpaceAttack(starship, gunner, weaponItem, options) {
         score = options.attackDM;
     }
     let dice = `${options.results?options.results.dice:"2D6"} + ${score}`;
+    dice = appendArmourPenalty(dice, gunner);
 
     let damageDice = weaponItem.system.weapon.damage;
 
