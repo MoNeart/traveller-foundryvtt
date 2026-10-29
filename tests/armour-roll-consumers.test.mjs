@@ -47,9 +47,10 @@ function traveller() {
             skills: {
                 vaccsuit: {trained: true, value: 1},
                 stealth: {id: "stealth", label: "Stealth", trained: true, value: 0, default: "DEX", specialities: {}},
+                persuade: {id: "persuade", label: "Persuade", trained: true, value: 0, default: "SOC", specialities: {}},
                 jackofalltrades: {trained: false, value: 0}
             },
-            characteristics: {DEX: {dm: 1, value: 8}},
+            characteristics: {DEX: {dm: 1, value: 8}, SOC: {dm: 1, value: 8}},
             modifiers: {
                 encumbrance: {dm: -2},
                 physical: {dm: 0},
@@ -58,7 +59,6 @@ function traveller() {
             }
         },
         items: [{type: "armour", system: {status: "equipped", armour: {skill: "2"}}}],
-        getArmourSkillPenalty: () => -1,
         getEffect: () => null,
         getRollData: () => ({})
     };
@@ -86,6 +86,7 @@ test("normal dialog dispatch submits to the real rollSkill consumer", async () =
     assert.match(formula, /\+1\[DEX\]/);
     assert.match(formula, /-2\[Enc\]/);
     assert.match(formula, /- 1\[Armour\]/);
+    assert.equal(formula.match(/\[Armour\]/g)?.length, 1);
 });
 
 test("Shift inversion dispatches directly to the real rollSkill consumer", async () => {
@@ -105,6 +106,42 @@ test("Shift inversion dispatches directly to the real rollSkill consumer", async
     });
     assert.equal(dialogOpened, false);
     assert.match(formulas.at(-1), /- 1\[Armour\]/);
+});
+
+test("actual skill and equipment changes are reflected on the next consumer call", async () => {
+    const actor = traveller();
+    actor.system.skills.vaccsuit.value = 0;
+    formulas.length = 0;
+    await rollSkill(actor, "stealth", {cha: "DEX", rollType: "normal", difficulty: 8});
+    assert.match(formulas.at(-1), /- 2\[Armour\]/);
+
+    actor.system.skills.vaccsuit.value = 2;
+    formulas.length = 0;
+    await rollSkill(actor, "stealth", {cha: "DEX", rollType: "normal", difficulty: 8});
+    assert.doesNotMatch(formulas.at(-1), /\[Armour\]/);
+
+    actor.system.skills.vaccsuit.value = 0;
+    actor.items[0].system.status = "carried";
+    formulas.length = 0;
+    await rollSkill(actor, "stealth", {cha: "DEX", rollType: "normal", difficulty: 8});
+    assert.doesNotMatch(formulas.at(-1), /\[Armour\]/);
+});
+
+test("mental and social checks apply armour without physical encumbrance", async () => {
+    formulas.length = 0;
+    await rollSkill(traveller(), "persuade", {cha: "SOC", rollType: "normal", difficulty: 8});
+    const formula = formulas.at(-1);
+    assert.match(formula, /- 1\[Armour\]/);
+    assert.doesNotMatch(formula, /\[Enc\]/);
+    assert.equal(formula.match(/\[Armour\]/g)?.length, 1);
+});
+
+test("armour with no numeric requirement adds no armour term", async () => {
+    const actor = traveller();
+    actor.items[0].system.armour.skill = "-";
+    formulas.length = 0;
+    await rollSkill(actor, "stealth", {cha: "DEX", rollType: "normal", difficulty: 8});
+    assert.doesNotMatch(formulas.at(-1), /\[Armour\]/);
 });
 
 test("rollAttack consumer applies armour independently from attack encumbrance", async () => {
@@ -131,4 +168,38 @@ test("rollAttack consumer applies armour independently from attack encumbrance",
     const attackFormula = formulas.find(formula => formula.includes("[Armour]"));
     assert.match(attackFormula, /- 1\[Armour\]/);
     assert.match(attackFormula, /- 2\[Enc\]/);
+    assert.equal(attackFormula.match(/\[Armour\]/g)?.length, 1);
+});
+
+test("rollAttack adds Aimed exactly once and Single not at all", async () => {
+    const weapon = {
+        name: "Test Rifle",
+        img: "rifle.svg",
+        system: {
+            quantity: 1,
+            notes: "",
+            weapon: {
+                range: 100,
+                scale: "traveller",
+                skill: "guncombat.slug",
+                damage: "1D6",
+                damageType: "standard",
+                traits: "",
+                attackBonus: 0,
+                damageBonus: null
+            }
+        }
+    };
+    formulas.length = 0;
+    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 1, rangeDM: -2, rollType: "normal", autoOption: "aimed"});
+    const aimed = formulas.find(formula => formula.includes("[Aimed]"));
+    assert.equal(aimed.match(/\[Aimed\]/g)?.length, 1);
+    assert.match(aimed, /\+ 1\[DM\]/);
+    assert.match(aimed, /- 2\[Range\]/);
+
+    formulas.length = 0;
+    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 1, rangeDM: -2, rollType: "normal", autoOption: "single"});
+    const single = formulas.find(formula => formula.includes("[Armour]"));
+    assert.doesNotMatch(single, /\[Aimed\]/);
+    assert.match(single, /\+ 1\[DM\]/);
 });
