@@ -13,6 +13,7 @@ import {MgT2Item} from "../documents/item.mjs";
 import { MGT2 } from "../helpers/config.mjs";
 import {NpcIdCard} from "../helpers/id-card.mjs";
 import {randomiseAssociate} from "../helpers/utils/character-utils.mjs";
+import {dispatchSkillCheck} from "../helpers/utils/skill-roll-dispatch.mjs";
 import {
     buyCargoDialog, embarkPassengerDialog,
     fuelCost,
@@ -2914,23 +2915,20 @@ export class MgT2ActorSheet extends foundry.appv1.sheets.ActorSheet {
                 skillFqn = skillFqn + "." + specId;
             }
         }
-        let quickRoll = game.settings.get("mgt2e", "quickRolls");
-        if (event.shiftKey) {
-            quickRoll = !quickRoll;
-        }
         if (event.ctrlKey || event.metaKey) {
             new MgT2XPDialog(actor, skillId, specId, cha).render(true);
-        } else if (!quickRoll) {
-            new MgT2SkillDialog(actor, skillFqn, {
-                "cha": cha
-            }).render(true);
         } else {
-            // Roll directly with no options.
-            rollSkill(actor, skillFqn, {
-                "speciality": specId,
-                "cha": skillDefault,
-                "rollType": "normal",
-                "difficulty": 8
+            dispatchSkillCheck({
+                actor,
+                skillFqn,
+                speciality: specId,
+                dialogCharacteristic: cha,
+                quickCharacteristic: skillDefault,
+                quickRolls: game.settings.get("mgt2e", "quickRolls"),
+                shiftKey: event.shiftKey,
+                openDialog: (dialogActor, dialogSkill, options) =>
+                    new MgT2SkillDialog(dialogActor, dialogSkill, options).render(true),
+                rollSkill
             });
         }
     }

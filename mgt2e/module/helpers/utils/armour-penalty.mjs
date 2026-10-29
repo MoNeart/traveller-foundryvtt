@@ -8,7 +8,10 @@ export function getArmourSkillPenalty(actor) {
     const items = typeof actor.items.values === "function" ? actor.items.values() : actor.items;
     for (const item of items) {
         if (item?.type !== "armour" || itemStatus(item) !== "equipped") continue;
-        const value = Number(item.system?.armour?.skill);
+        const rawValue = item.system?.armour?.skill;
+        if (typeof rawValue !== "number" && typeof rawValue !== "string") continue;
+        if (typeof rawValue === "string" && !/^\d+$/.test(rawValue.trim())) continue;
+        const value = Number(rawValue);
         if (!Number.isInteger(value) || value < 0) continue;
         required = required === null ? value : Math.max(required, value);
     }
