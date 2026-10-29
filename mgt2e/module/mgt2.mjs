@@ -44,6 +44,7 @@ import {
     launchSwarmHandler, showSwarmHandler
 } from "./helpers/spacecraft/spacecraft-utils.mjs";
 import {onManageActiveEffect} from "./helpers/effects.mjs";
+import {getWeaponRangeBands, getWeaponRangeUnit} from "./helpers/utils/range-utils.mjs";
 const  { renderTemplate } = foundry.applications.handlebars;
 
 const { Actors, Items } = foundry.documents.collections;
@@ -2423,14 +2424,9 @@ Handlebars.registerHelper('showTraits', function(key, traits) {
 Handlebars.registerHelper('showWeaponRange', function(item) {
     let html = `<div class="grid grid-4col weapon-range">`;
 
-    const range = parseInt(item.system.weapon.range);
-    const shortRange = range / 4;
-    const longRange = range * 2;
-    const extremeRange = range * 4;
-    let unit = "m";
-    if (item.system.weapon.scale === "vehicle") {
-        unit = "km";
-    }
+    const bands = getWeaponRangeBands(item.system.weapon.range, item.system.weapon.scale);
+    const {short: shortRange, medium: range, long: longRange, extreme: extremeRange} = bands.display;
+    const unit = bands.unit;
 
     html += `<div><label>Short (+1)</label><span>${shortRange}${unit}</span></div>`;
     html += `<div><label>Medium</label><span>${range}${unit}</span></div>`;
@@ -2867,7 +2863,7 @@ Handlebars.registerHelper("itemBlock", function(actor, item, types) {
     switch (item.type) {
         case "weapon":
             if (system.weapon) {
-                html += `<b>D:</b> ${system.weapon.damage} <b>R:</b> ${system.weapon.range}m `;
+                html += `<b>D:</b> ${system.weapon.damage} <b>R:</b> ${system.weapon.range}${getWeaponRangeUnit(system.weapon.scale)} `;
             }
             break;
         case "armour":
@@ -3064,4 +3060,3 @@ Hooks.once("ready", async function() {
         }
     }
 });
-

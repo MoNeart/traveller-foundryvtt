@@ -677,7 +677,7 @@ export class MgT2ActorSheet extends foundry.appv1.sheets.ActorSheet {
 
         let weight = 0;
         let skillNeeded = -3;
-        let vs = this.actor.system.skills.vaccsuit;
+        const vs = this.actor.system.skills.vaccsuit;
 
         // Iterate through items, allocating to containers
         for (let i of context.items) {
@@ -754,20 +754,7 @@ export class MgT2ActorSheet extends foundry.appv1.sheets.ActorSheet {
         if (!this.actor.vaccLock) {
             this.actor.vaccLock = true;
             try {
-                let isVaccSuit = false;
-                if (skillNeeded >= 0) {
-                    let vaccSkill = -3;
-                    if (vs && vs.trained) {
-                        vaccSkill = parseInt(vs.value);
-                        if (vaccSkill < skillNeeded) {
-                            this.actor.system.modifiers.encumbrance.auto -= (skillNeeded - vaccSkill);
-                            isVaccSuit = true;
-                        }
-                    } else {
-                        this.actor.system.modifiers.encumbrance.auto += vaccSkill;
-                        isVaccSuit = true;
-                    }
-                }
+                const isVaccSuit = this.actor.getArmourSkillPenalty() < 0;
                 await this.actor.setVaccSuitEffect(isVaccSuit);
             } finally {
                 delete this.actor.vaccLock;
