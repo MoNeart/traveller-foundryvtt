@@ -1,6 +1,7 @@
 import {rollAttack, hasTrait, getTraitValue, skillLabel} from "../helpers/dice-rolls.mjs";
 import {getSkillValue} from "../helpers/dice-rolls.mjs";
 import {getAttackerTokens} from "./utils/combat-utils.mjs";
+import {getWeaponRangeBands} from "./utils/range-utils.mjs";
 
 export class MgT2AttackDialog extends Application {
     static get defaultOptions() {
@@ -74,16 +75,15 @@ export class MgT2AttackDialog extends Application {
         this.damage = this.damage.toUpperCase().replace(/D6/, "D");
         this.damage = this.damage.replace(/ *\* *10/, "D");
 
-        this.range = parseInt(this.weapon.system.weapon.range);
+        const rangeBands = getWeaponRangeBands(this.weapon.system.weapon.range, weapon.system.weapon.scale);
+        this.range = rangeBands.display.medium;
         this.melee = true;
         if (this.range > 0) {
             this.melee = false;
-            this.shortRange = parseInt(this.range / 4);
-            this.longRange = parseInt(this.range * 2);
-            this.extremeRange = parseInt(this.range * 4);
-            if (weapon.system.weapon.scale === "vehicle") {
-                this.rangeUnit = "km";
-            }
+            this.shortRange = rangeBands.display.short;
+            this.longRange = rangeBands.display.long;
+            this.extremeRange = rangeBands.display.extreme;
+            this.rangeUnit = rangeBands.unit;
 
             this.RANGES = {};
             this.RANGES["+1"] = `${game.i18n.localize("MGT2.Attack.short")} (${this.shortRange}${this.rangeUnit}, +1)`;
