@@ -31,6 +31,16 @@
             <span>{{weaponItem.system.weapon.damage}}</span>
         </div>
 
+        {{#if canAim}}
+            <div class="resource flex-group-center">
+                <label class="field-label">Aiming actions</label>
+                <select name="aimingActions" data-action="changeAimingActions">
+                    {{selectOptions AIMING_ACTIONS selected=aimingActions}}
+                </select>
+                <small>Track consecutive actions on the same target. Do not add this bonus again in DM. Full Auto cannot use aiming actions.</small>
+            </div>
+        {{/if}}
+
         <div class="resource flex-group-center grid-span-1">
             <label class="field-label">{{localize 'MGT2.Range'}}</label>
             <select name="range" data-action="changeRange">

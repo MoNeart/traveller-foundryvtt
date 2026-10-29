@@ -60,6 +60,13 @@
                     {{selectOptions RANGES selected="+0"}}
                 </select>
             </div>
+            <div class="aiming">
+                <label for="aimingActions" class="skillDialogLabel">Aiming actions</label>
+                <select class="attackDialogAiming" name="aimingActions">
+                    {{selectOptions AIMING_ACTIONS selected=aimingActions}}
+                </select>
+                <small>Track consecutive actions on the same target. Do not add this bonus again in DM. Quick attacks use 0.</small>
+            </div>
         {{/if}}
 
         {{#if hasAuto}}

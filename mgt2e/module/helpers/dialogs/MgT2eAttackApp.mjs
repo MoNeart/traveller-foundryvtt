@@ -4,6 +4,7 @@ import {getTraitValue, hasTrait, rollAttack, rollSpaceAttack} from "../dice-roll
 import {getAttackerTokens, getTargetData} from "../utils/combat-utils.mjs";
 import {formatRangeDMOption, getTargetRangeBand, getWeaponRangeBands, rebindTargetById, resolveRangeDM} from "../utils/range-utils.mjs";
 import {MGT2} from "../config.mjs";
+import {parseAimingActions, resetAimingForTargetChange} from "../utils/attack-modifiers.mjs";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api
 const MANUAL_RANGE_DMS = new Set([1, 0, -2, -4]);
 
@@ -26,6 +27,7 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.weaponItem = weaponItem;
         this.attackOptions = attackOptions;
         this.shotType = "single";
+        this.aimingActions = 0;
 
         if (this.attackOptions?.vehicle) {
             this.ATTACKER_TOKENS = getAttackerTokens(this.attackOptions.vehicle);
@@ -83,7 +85,7 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _getRangeDM(target) {
         const result = getTargetRangeBand(target.distanceMetres ?? target.distance, this.rangeBands, {
-            aimed: this.shotType === "aimed",
+            aimed: this.aimingActions > 0,
             hasScope: hasTrait(this.weaponItem.system.weapon.traits, "scope")
         });
         if (result.band === "outOfRange") {
@@ -104,7 +106,6 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.skillDM = (this.actor?.getSkillValue(skill, { cha: characteristic }) + characteristicDM) || 0;
         this.isMelee = (this.weaponItem.system.weapon.range > 0)?false:true;
         this.isAutoFire = hasTrait(this.weaponItem.system.weapon.traits, "auto");
-        this.aimingBonus = 1;
         this.isOutOfAmmo = false;
         this.currentAmmo = this.weaponItem.useAmmo()?this.weaponItem.system.weapon.ammo:0;
         this.autoFire = getTraitValue(this.weaponItem.system.weapon.traits, "auto");
@@ -119,6 +120,8 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 { type: "submit", icon: "fa-solid fa-save", label: "Attack" }
             ]
         }
+        context.isMelee = this.isMelee;
+        context.canAim = !this.isMelee && !!this.actor;
         this.rangeBands = getWeaponRangeBands(this.weaponItem.system.weapon.range, this.weaponItem.system.weapon.scale);
         this.range = this.rangeBands.display;
 
@@ -140,6 +143,9 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         context.shotType = this.shotType;
+        context.aimingActions = this.aimingActions;
+        context.AIMING_ACTIONS = {};
+        for (let i = 0; i <= 6; i++) context.AIMING_ACTIONS[i] = `${i}`;
         context.SHOT_SELECT = {};
         if (this.isMelee) {
             context.SHOT_SELECT["melee"] = game.i18n.format("MGT2.AttackDialog.ShotType.melee");
@@ -159,11 +165,13 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     ammo: this.fullAuto * 3
                 });
             }
-            context.SHOT_SELECT["aimed"] = game.i18n.format("MGT2.AttackDialog.ShotType.aimed", {bonus: this.aimingBonus});
         }
         // Recalculate target records and rebind the selection by stable token id.
         const currentTargetId = this.currentTarget?.token?.document?._id ?? this.currentTargetId;
         const rawTargets = getTargetData(this.ATTACKER_TOKEN) ?? [];
+        if (currentTargetId && !rawTargets.some(t => t.token?.document?._id === currentTargetId)) {
+            this.aimingActions = 0;
+        }
         const eligibleTargets = [];
         if (this.ATTACKER_TOKEN) {
             context.ATTACKER_TOKEN = this.ATTACKER_TOKEN;
@@ -198,6 +206,8 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.TARGETS = eligibleTargets;
             context.TARGETS = eligibleTargets;
             this.currentTarget = rebindTargetById(eligibleTargets, currentTargetId);
+            const reboundTargetId = this.currentTarget?.token?.document?._id;
+            this.aimingActions = resetAimingForTargetChange(this.aimingActions, currentTargetId, reboundTargetId);
             if (this.currentTarget) this.currentTargetId = this.currentTarget.token.document._id;
         } else {
             this.TARGETS = [];
@@ -216,6 +226,7 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
             options.window.title = game.i18n.format("MGT2.AttackDialog.Title", { name: this.attackerTokenName });
         }
         context.currentTarget = this.currentTarget;
+        context.aimingActions = this.aimingActions;
         context.manualRangeRequired = !this.isMelee && !this.currentTarget;
         if (context.manualRangeRequired) {
             context.RANGE_SELECT = {"": "Select range...", ...context.RANGE_SELECT};
@@ -262,6 +273,7 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const target = this.TARGETS.filter(t => t.token.document._id === id)[0];
                 const rangeSelect = this.element.querySelector('select[data-action="changeRange"]');
                 this.rangeOverrideDM = undefined;
+                this.aimingActions = 0;
                 rangeSelect.value = formatRangeDMOption(target.rangeDM);
                 this.currentTarget = target;
                 this.currentTargetId = target.token.document._id;
@@ -289,6 +301,7 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.currentTarget = null;
                 this.currentTargetId = undefined;
                 this.rangeOverrideDM = undefined;
+                this.aimingActions = 0;
                 this.render();
             });
         }
@@ -300,6 +313,20 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 ev.stopImmediatePropagation();
                 this.shotType = ev.target.value;
                 console.log(this.shotType);
+                this.render();
+            });
+        }
+
+        const aimingSelect = this.element.querySelector('select[data-action="changeAimingActions"]');
+        if (aimingSelect) {
+            aimingSelect.addEventListener("change", (ev) => {
+                const actions = parseAimingActions(ev.target.value);
+                if (actions === null) {
+                    ui.notifications.warn("Aiming actions must be a whole number from 0 to 6.");
+                    ev.target.value = `${this.aimingActions}`;
+                    return;
+                }
+                this.aimingActions = actions;
                 this.render();
             });
         }
@@ -327,9 +354,19 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return null;
         }
         const rangeDM = manualRangeDM ?? resolveRangeDM(undefined, this.currentTarget?.rangeDM);
+        const aimingActions = this.isMelee || !this.actor ? 0 : parseAimingActions(formData.object.aimingActions);
+        if (aimingActions === null) {
+            ui.notifications.warn("Aiming actions must be a whole number from 0 to 6.");
+            return null;
+        }
+        if (aimingActions > 0 && formData.object.shotType === "full") {
+            ui.notifications.warn("Aiming with Full Auto is not supported because one aim sequence cannot be assigned safely across multiple attacks.");
+            return null;
+        }
 
         this.attackOptions.autoOption = formData.object.shotType;
         this.attackOptions.rollType = formData.object.rollType;
+        this.attackOptions.aimingActions = aimingActions;
 
         if (event.type === "submit") {
             this.rollAttack(customDM, rangeDM);

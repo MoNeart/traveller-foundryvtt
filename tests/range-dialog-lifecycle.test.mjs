@@ -5,7 +5,7 @@ import {getTargetRangeBand, getWeaponRangeBands, rebindTargetById, resolveRangeD
 
 const target = id => ({token: {document: {_id: id}}});
 
-test("selected target is rebound after Single to Aimed recalculation", () => {
+test("selected target is rebound after aiming-range recalculation", () => {
     const targets = [target("a"), target("b")];
     assert.equal(rebindTargetById(targets, "b"), targets[1]);
     const bands = getWeaponRangeBands(2.5, "vehicle");
@@ -13,7 +13,7 @@ test("selected target is rebound after Single to Aimed recalculation", () => {
     assert.equal(getTargetRangeBand(2500, bands, {aimed: true, hasScope: true}).dm, 0);
 });
 
-test("Aimed to Single reversal preserves identity and restores scope limit", () => {
+test("aiming reset preserves identity and restores scope limit", () => {
     const selected = target("b");
     assert.equal(rebindTargetById([target("a"), selected], "b"), selected);
     assert.equal(getTargetRangeBand(2500, getWeaponRangeBands(2.5, "vehicle"), {aimed: false, hasScope: true}).dm, -4);
@@ -41,4 +41,11 @@ test("template presents an explicit manual-range placeholder", () => {
     const source = fs.readFileSync(new URL("../mgt2e/templates/dialogs/attack-dialog.html", import.meta.url), "utf8");
     assert.match(source, /selectOptions RANGE_SELECT selected=selectedRangeDM/);
     assert.match(source, /manualRangeRequired/);
+});
+
+test("dialog resets aiming when target rebinding changes identity and rejects aim plus Full Auto", () => {
+    const source = fs.readFileSync(new URL("../mgt2e/module/helpers/dialogs/MgT2eAttackApp.mjs", import.meta.url), "utf8");
+    assert.match(source, /resetAimingForTargetChange\(this\.aimingActions, currentTargetId, reboundTargetId\)/);
+    assert.match(source, /!rawTargets\.some[\s\S]*this\.aimingActions = 0/);
+    assert.match(source, /aimingActions > 0 && formData\.object\.shotType === "full"/);
 });

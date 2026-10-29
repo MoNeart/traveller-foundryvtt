@@ -181,7 +181,7 @@ test("rollAttack consumer applies armour independently from attack encumbrance",
     assert.equal(attackFormula.match(/\[Armour\]/g)?.length, 1);
 });
 
-test("rollAttack adds Aimed exactly once and Single not at all", async () => {
+test("rollAttack adds the selected aiming actions exactly once", async () => {
     const weapon = {
         name: "Test Rifle",
         img: "rifle.svg",
@@ -201,17 +201,33 @@ test("rollAttack adds Aimed exactly once and Single not at all", async () => {
         }
     };
     formulas.length = 0;
-    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 1, rangeDM: -2, rollType: "normal", autoOption: "aimed"});
+    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 1, rangeDM: -2, rollType: "normal", autoOption: "single", aimingActions: 6});
     const aimed = formulas.find(formula => formula.includes("[Aimed]"));
     assert.equal(aimed.match(/\[Aimed\]/g)?.length, 1);
+    assert.match(aimed, /\+ 6\[Aimed\]/);
     assert.match(aimed, /\+ 1\[DM\]/);
     assert.match(aimed, /- 2\[Range\]/);
 
     formulas.length = 0;
-    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 1, rangeDM: -2, rollType: "normal", autoOption: "single"});
+    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 1, rangeDM: -2, rollType: "normal", autoOption: "single", aimingActions: 0});
     const single = formulas.find(formula => formula.includes("[Armour]"));
     assert.doesNotMatch(single, /\[Aimed\]/);
     assert.match(single, /\+ 1\[DM\]/);
+
+    formulas.length = 0;
+    const spacecraftWeapon = structuredClone(weapon);
+    spacecraftWeapon.system.weapon.scale = "spacecraft";
+    await rollAttack(traveller(), spacecraftWeapon, {skillDM: 0, dm: 0, rangeDM: 0, rollType: "normal", aimingActions: 6});
+    assert.doesNotMatch(formulas.at(-1), /\[Aimed\]/);
+
+    formulas.length = 0;
+    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 0, rangeDM: 0, rollType: "normal"});
+    assert.doesNotMatch(formulas.at(-1), /\[Aimed\]/, "quick/default consumer calls use zero aiming actions");
+
+    formulas.length = 0;
+    await rollAttack(traveller(), weapon, {skillDM: 0, dm: 0, rangeDM: 0, rollType: "normal", autoOption: "burst", aimingActions: 2, shotsFired: 2});
+    assert.equal(formulas.at(-1).match(/\[Aimed\]/g)?.length, 1);
+    assert.match(formulas.at(-1), /\+ 2\[Aimed\]/);
 });
 
 test("rollSpaceAttack applies armour only to an explicit character gunner", async () => {

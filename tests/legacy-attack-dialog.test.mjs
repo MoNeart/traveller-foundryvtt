@@ -68,6 +68,22 @@ test("legacy personal attack dialog renders fractional Short range", () => {
     assert.equal(context.longRange, 50);
     assert.equal(context.extremeRange, 100);
     assert.equal(dialog.RANGES["+1"], "MGT2.Attack.short (6.25m, +1)");
+    assert.deepEqual(dialog.AIMING_ACTIONS, {0: "0", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6"});
+    assert.equal(context.aimingActions, 0);
+});
+
+test("legacy melee dialog exposes no aiming actions", () => {
+    const dialog = new MgT2AttackDialog(actor(), weapon(0));
+    assert.equal(dialog.getData().AIMING_ACTIONS, undefined);
+});
+
+test("legacy dialog reopen or weapon change starts aiming at zero", () => {
+    const first = new MgT2AttackDialog(actor(), weapon(25));
+    first.aimingActions = 6;
+    const reopened = new MgT2AttackDialog(actor(), weapon(25));
+    const changedWeapon = new MgT2AttackDialog(actor(), weapon(100));
+    assert.equal(reopened.getData().aimingActions, 0);
+    assert.equal(changedWeapon.getData().aimingActions, 0);
 });
 
 test("legacy vehicle attack dialog preserves fractional kilometre bands", () => {

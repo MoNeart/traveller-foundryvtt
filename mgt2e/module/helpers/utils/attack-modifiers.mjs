@@ -1,3 +1,20 @@
-export function appendAimedModifier(formula, attackOptions = {}) {
-    return attackOptions.autoOption === "aimed" ? `${formula} + 1[Aimed]` : formula;
+export function parseAimingActions(value) {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === "string" && value.trim() === "") return 0;
+    if (!["number", "string"].includes(typeof value)) return null;
+    const actions = Number(value);
+    return Number.isInteger(actions) && actions >= 0 && actions <= 6 ? actions : null;
+}
+
+export function appendAimedModifier(formula, attackOptions = {}, weapon = null, actor = null) {
+    const actions = parseAimingActions(attackOptions.aimingActions);
+    if (!actor) return formula;
+    if (!weapon || Number(weapon.system?.weapon?.range) <= 0) return formula;
+    if (weapon.system?.weapon?.scale === "spacecraft") return formula;
+    if (attackOptions.autoOption === "full") return formula;
+    return actions > 0 ? `${formula} + ${actions}[Aimed]` : formula;
+}
+
+export function resetAimingForTargetChange(aimingActions, previousTargetId, nextTargetId) {
+    return previousTargetId && previousTargetId !== nextTargetId ? 0 : aimingActions;
 }

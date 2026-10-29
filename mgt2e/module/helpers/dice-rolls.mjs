@@ -362,7 +362,7 @@ export async function rollAttack(actor, weapon, attackOptions) {
             dice += ` - ${Math.abs(parseInt(attackOptions.dm))}[DM]`;
         }
     }
-    dice = appendAimedModifier(dice, attackOptions);
+    dice = appendAimedModifier(dice, attackOptions, weapon, actor);
     if (attackOptions.rangeDM) {
         if (attackOptions.rangeDM > 0) {
             dice += ` + ${attackOptions.rangeDM}[Range]`;
