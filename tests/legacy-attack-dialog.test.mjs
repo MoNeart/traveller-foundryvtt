@@ -138,7 +138,15 @@ test("actual legacy personal handler rejects invalid aiming values", async () =>
 
 test("legacy aiming guidance explicitly requires reset after target change", async () => {
     const template = await import("node:fs").then(fs => fs.readFileSync(new URL("../mgt2e/templates/attack-dialog.html", import.meta.url), "utf8"));
+    assert.match(template, /#if AIMING_ACTIONS[\s\S]*class="aiming"[\s\S]*\/if/);
     assert.match(template, /Reset to 0 if the target changes/);
+});
+
+test("legacy context omits aiming control data for noncharacter and spacecraft attacks", () => {
+    const noncharacter = actor();
+    noncharacter.type = "vehicle";
+    assert.equal(new MgT2AttackDialog(noncharacter, weapon(25)).getData().AIMING_ACTIONS, undefined);
+    assert.equal(new MgT2AttackDialog(actor(), weapon(25, "spacecraft")).getData().AIMING_ACTIONS, undefined);
 });
 
 test("legacy vehicle attack dialog preserves fractional kilometre bands", () => {

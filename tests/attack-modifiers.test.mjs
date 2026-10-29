@@ -31,6 +31,8 @@ test("melee, spacecraft scale and Full Auto exclude aiming", () => {
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2, autoOption: "burst"}, ranged, actor), "2D6 + 2[Aimed]");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, ranged, null), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, ranged, {type: "vehicle"}), "2D6");
+    assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, {system: {weapon: {scale: "traveller"}}}, actor), "2D6");
+    assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, {system: {weapon: {range: "invalid", scale: "traveller"}}}, actor), "2D6");
 });
 
 test("aiming action validation rejects fractional and out-of-range values", () => {

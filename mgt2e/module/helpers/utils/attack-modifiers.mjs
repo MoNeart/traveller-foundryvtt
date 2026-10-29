@@ -13,7 +13,8 @@ export function isCharacterAimingActor(actor) {
 export function appendAimedModifier(formula, attackOptions = {}, weapon = null, actor = null) {
     const actions = parseAimingActions(attackOptions.aimingActions);
     if (!isCharacterAimingActor(actor)) return formula;
-    if (!weapon || Number(weapon.system?.weapon?.range) <= 0) return formula;
+    const range = Number(weapon?.system?.weapon?.range);
+    if (!Number.isFinite(range) || range <= 0) return formula;
     if (weapon.system?.weapon?.scale === "spacecraft") return formula;
     if (attackOptions.autoOption === "full") return formula;
     return actions > 0 ? `${formula} + ${actions}[Aimed]` : formula;
