@@ -5,7 +5,12 @@ globalThis.Application = class {
     static get defaultOptions() { return {}; }
     constructor() { this.options = {}; }
 };
-globalThis.Roll = class {};
+const formulas = [];
+globalThis.Roll = class {
+    constructor(formula) { this.formula = formula; this.total = 8; this.dice = [{total: 8}]; formulas.push(formula); }
+    async evaluate() { return this; }
+    toMessage() {}
+};
 globalThis.ChatMessage = {getSpeaker: () => ({})};
 globalThis.CONST = {ACTIVE_EFFECT_MODES: {ADD: 2}};
 globalThis.CONFIG = {MGT2: {WEAPONS: {traits: {}}}};
@@ -16,12 +21,16 @@ globalThis.game = {
     settings: {get: () => false}
 };
 globalThis.canvas = {tokens: {controlled: []}, grid: {size: 100, distance: 1}};
+globalThis.ui = {notifications: {warn: () => {}}};
 globalThis.window = globalThis;
 
 const {MgT2AttackDialog} = await import("../mgt2e/module/helpers/attack-dialog.mjs");
 
 function actor() {
     return {
+        name: "Test Traveller",
+        type: "traveller",
+        thumbnail: "test.svg",
         system: {
             skills: {
                 guncombat: {
@@ -34,14 +43,18 @@ function actor() {
                 jackofalltrades: {trained: false, value: 0}
             },
             characteristics: {DEX: {dm: 0}},
-            modifiers: {guncombat: {dm: 0}}
-        }
+            modifiers: {guncombat: {dm: 0}, melee: {dm: 0}, encumbrance: {dm: 0}, physical: {dm: 0}}
+        },
+        items: [],
+        getEffect: () => null,
+        getRollData: () => ({})
     };
 }
 
 function weapon(range, scale = "traveller") {
     return {
         name: "Antique Rifle",
+        img: "rifle.svg",
         system: {
             quantity: 1,
             weapon: {
@@ -49,8 +62,11 @@ function weapon(range, scale = "traveller") {
                 skill: "guncombat.slug",
                 traits: "",
                 damage: "3D6-3",
+                damageType: "standard",
                 range,
                 scale,
+                attackBonus: 0,
+                damageBonus: null,
                 magazine: 1,
                 ammo: 1
             }
@@ -58,6 +74,18 @@ function weapon(range, scale = "traveller") {
         useAmmo: () => false,
         hasTrait: () => false
     };
+}
+
+function htmlForAim(aimingActions) {
+    const values = new Map([
+        ["input[class='skillDialogDM']", [{value: "0"}]],
+        [".skillDialogRollType", [{value: "normal"}]],
+        [".attackDialogRange", [{value: "0"}]],
+        [".attackDialogAuto", []],
+        [".attackDialogAiming", [{value: `${aimingActions}`}]],
+        [".attackDialogPsi", []]
+    ]);
+    return {find: selector => values.get(selector) ?? []};
 }
 
 test("legacy personal attack dialog renders fractional Short range", () => {
@@ -84,6 +112,33 @@ test("legacy dialog reopen or weapon change starts aiming at zero", () => {
     const changedWeapon = new MgT2AttackDialog(actor(), weapon(100));
     assert.equal(reopened.getData().aimingActions, 0);
     assert.equal(changedWeapon.getData().aimingActions, 0);
+});
+
+test("actual legacy personal handler submits 0, 1 and 6 aiming actions to rollAttack", async () => {
+    for (const actions of [0, 1, 6]) {
+        formulas.length = 0;
+        const dialog = new MgT2AttackDialog(actor(), weapon(25));
+        dialog.close = () => {};
+        await dialog.onRollClick({preventDefault() {}}, htmlForAim(actions));
+        await new Promise(resolve => setImmediate(resolve));
+        const attack = formulas.find(formula => formula.includes("2D6"));
+        if (actions === 0) assert.doesNotMatch(attack, /\[Aimed\]/);
+        else assert.match(attack, new RegExp(`\\+ ${actions}\\[Aimed\\]`));
+    }
+});
+
+test("actual legacy personal handler rejects invalid aiming values", async () => {
+    formulas.length = 0;
+    const dialog = new MgT2AttackDialog(actor(), weapon(25));
+    dialog.close = () => {};
+    await dialog.onRollClick({preventDefault() {}}, htmlForAim("1.5"));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(formulas.length, 0);
+});
+
+test("legacy aiming guidance explicitly requires reset after target change", async () => {
+    const template = await import("node:fs").then(fs => fs.readFileSync(new URL("../mgt2e/templates/attack-dialog.html", import.meta.url), "utf8"));
+    assert.match(template, /Reset to 0 if the target changes/);
 });
 
 test("legacy vehicle attack dialog preserves fractional kilometre bands", () => {

@@ -46,6 +46,5 @@ test("template presents an explicit manual-range placeholder", () => {
 test("dialog resets aiming when target rebinding changes identity and rejects aim plus Full Auto", () => {
     const source = fs.readFileSync(new URL("../mgt2e/module/helpers/dialogs/MgT2eAttackApp.mjs", import.meta.url), "utf8");
     assert.match(source, /resetAimingForTargetChange\(this\.aimingActions, currentTargetId, reboundTargetId\)/);
-    assert.match(source, /!rawTargets\.some[\s\S]*this\.aimingActions = 0/);
     assert.match(source, /aimingActions > 0 && formData\.object\.shotType === "full"/);
 });

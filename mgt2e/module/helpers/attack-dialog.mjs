@@ -2,7 +2,7 @@ import {rollAttack, hasTrait, getTraitValue, skillLabel} from "../helpers/dice-r
 import {getSkillValue} from "../helpers/dice-rolls.mjs";
 import {getAttackerTokens} from "./utils/combat-utils.mjs";
 import {getWeaponRangeBands} from "./utils/range-utils.mjs";
-import {parseAimingActions} from "./utils/attack-modifiers.mjs";
+import {isCharacterAimingActor, parseAimingActions} from "./utils/attack-modifiers.mjs";
 
 export class MgT2AttackDialog extends Application {
     static get defaultOptions() {
@@ -92,8 +92,10 @@ export class MgT2AttackDialog extends Application {
             this.RANGES["+0"] = `${game.i18n.localize("MGT2.Attack.medium")} (${this.range}${this.rangeUnit}, +0)`;
             this.RANGES["-2"] = `${game.i18n.localize("MGT2.Attack.long")} (${this.longRange}${this.rangeUnit}, -2)`;
             this.RANGES["-4"] = `${game.i18n.localize("MGT2.Attack.extreme")} (${this.extremeRange}${this.rangeUnit}, -4)`;
-            this.AIMING_ACTIONS = {};
-            for (let i = 0; i <= 6; i++) this.AIMING_ACTIONS[i] = `${i}`;
+            if (isCharacterAimingActor(this.actor) && weapon.system.weapon.scale !== "spacecraft") {
+                this.AIMING_ACTIONS = {};
+                for (let i = 0; i <= 6; i++) this.AIMING_ACTIONS[i] = `${i}`;
+            }
         } else {
             this.parryBonus = weapon.system.weapon.parryBonus;
             if (!this.parryBonus) {

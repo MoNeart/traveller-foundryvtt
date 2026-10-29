@@ -6,9 +6,13 @@ export function parseAimingActions(value) {
     return Number.isInteger(actions) && actions >= 0 && actions <= 6 ? actions : null;
 }
 
+export function isCharacterAimingActor(actor) {
+    return ["traveller", "npc"].includes(actor?.type);
+}
+
 export function appendAimedModifier(formula, attackOptions = {}, weapon = null, actor = null) {
     const actions = parseAimingActions(attackOptions.aimingActions);
-    if (!actor) return formula;
+    if (!isCharacterAimingActor(actor)) return formula;
     if (!weapon || Number(weapon.system?.weapon?.range) <= 0) return formula;
     if (weapon.system?.weapon?.scale === "spacecraft") return formula;
     if (attackOptions.autoOption === "full") return formula;
@@ -16,5 +20,5 @@ export function appendAimedModifier(formula, attackOptions = {}, weapon = null, 
 }
 
 export function resetAimingForTargetChange(aimingActions, previousTargetId, nextTargetId) {
-    return previousTargetId && previousTargetId !== nextTargetId ? 0 : aimingActions;
+    return previousTargetId !== nextTargetId ? 0 : aimingActions;
 }

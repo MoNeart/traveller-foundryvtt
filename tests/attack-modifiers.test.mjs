@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {appendAimedModifier, parseAimingActions, resetAimingForTargetChange} from "../mgt2e/module/helpers/utils/attack-modifiers.mjs";
+import {appendAimedModifier, isCharacterAimingActor, parseAimingActions, resetAimingForTargetChange} from "../mgt2e/module/helpers/utils/attack-modifiers.mjs";
 
-const actor = {};
+const actor = {type: "traveller"};
 
 test("aiming actions 0, 1 and 6 add one labelled term", () => {
     const weapon = {system: {weapon: {range: 100, scale: "traveller"}}};
@@ -30,6 +30,7 @@ test("melee, spacecraft scale and Full Auto exclude aiming", () => {
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2, autoOption: "full"}, ranged, actor), "2D6");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2, autoOption: "burst"}, ranged, actor), "2D6 + 2[Aimed]");
     assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, ranged, null), "2D6");
+    assert.equal(appendAimedModifier("2D6", {aimingActions: 2}, ranged, {type: "vehicle"}), "2D6");
 });
 
 test("aiming action validation rejects fractional and out-of-range values", () => {
@@ -43,4 +44,12 @@ test("target identity changes reset aiming while same target rerenders preserve 
     assert.equal(resetAimingForTargetChange(4, "target-a", "target-a"), 4);
     assert.equal(resetAimingForTargetChange(4, "target-a", "target-b"), 0);
     assert.equal(resetAimingForTargetChange(4, "target-a", undefined), 0);
+    assert.equal(resetAimingForTargetChange(4, undefined, "target-a"), 0);
+});
+
+test("only Traveller and NPC character actors can aim", () => {
+    assert.equal(isCharacterAimingActor({type: "traveller"}), true);
+    assert.equal(isCharacterAimingActor({type: "npc"}), true);
+    assert.equal(isCharacterAimingActor({type: "vehicle"}), false);
+    assert.equal(isCharacterAimingActor({type: "spacecraft"}), false);
 });

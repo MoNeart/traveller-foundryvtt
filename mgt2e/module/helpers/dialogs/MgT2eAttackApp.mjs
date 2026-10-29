@@ -4,7 +4,7 @@ import {getTraitValue, hasTrait, rollAttack, rollSpaceAttack} from "../dice-roll
 import {getAttackerTokens, getTargetData} from "../utils/combat-utils.mjs";
 import {formatRangeDMOption, getTargetRangeBand, getWeaponRangeBands, rebindTargetById, resolveRangeDM} from "../utils/range-utils.mjs";
 import {MGT2} from "../config.mjs";
-import {parseAimingActions, resetAimingForTargetChange} from "../utils/attack-modifiers.mjs";
+import {isCharacterAimingActor, parseAimingActions, resetAimingForTargetChange} from "../utils/attack-modifiers.mjs";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api
 const MANUAL_RANGE_DMS = new Set([1, 0, -2, -4]);
 
@@ -98,6 +98,28 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return result.dm;
     }
 
+    _buildEligibleTargets(rawTargets) {
+        const targets = [];
+        const select = {};
+        for (let target of rawTargets) {
+            let text = `${target.distance}m ${target.name}`;
+            if (target.type) text += ` [${game.i18n.localize("TYPES.Actor." + target.type)}]`;
+            if (target.sizeDM) text += ` [Size ${target.sizeDM > 0 ? "+" : ""}${target.sizeDM}]`;
+            if (target.facing) text += ` - ${game.i18n.localize("MGT2.Vehicle.Face." + target.facing)}`;
+
+            if (this.isMelee) {
+                if (target.distance >= 6) continue;
+            } else {
+                target.rangeDM = this._getRangeDM(target);
+                if (target.rangeDM) text += ` [${target.rangeDM}]`;
+                if (Number(target.rangeDM) <= -99) continue;
+            }
+            targets.push(target);
+            select[target.token.document._id] = text;
+        }
+        return {targets, select};
+    }
+
     async _prepareContext(options) {
         console.log("_prepareContext:");
         const characteristic = this.weaponItem.system.weapon.characteristic;
@@ -121,7 +143,9 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
             ]
         }
         context.isMelee = this.isMelee;
-        context.canAim = !this.isMelee && !!this.actor;
+        context.canAim = !this.isMelee
+            && this.weaponItem.system.weapon.scale !== "spacecraft"
+            && isCharacterAimingActor(this.actor);
         this.rangeBands = getWeaponRangeBands(this.weaponItem.system.weapon.range, this.weaponItem.system.weapon.scale);
         this.range = this.rangeBands.display;
 
@@ -169,45 +193,21 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Recalculate target records and rebind the selection by stable token id.
         const currentTargetId = this.currentTarget?.token?.document?._id ?? this.currentTargetId;
         const rawTargets = getTargetData(this.ATTACKER_TOKEN) ?? [];
-        if (currentTargetId && !rawTargets.some(t => t.token?.document?._id === currentTargetId)) {
-            this.aimingActions = 0;
-        }
-        const eligibleTargets = [];
         if (this.ATTACKER_TOKEN) {
             context.ATTACKER_TOKEN = this.ATTACKER_TOKEN;
-            context.TARGET_SELECT = {};
-            for (let t of rawTargets) {
-                let text = `${t.distance}m ${t.name}`;
-                if (t.type) {
-                    text += ` [${game.i18n.localize("TYPES.Actor." + t.type)}]`;
-                }
-                if (t.sizeDM) {
-                    text += ` [Size ${t.sizeDM>0?"+":""}${t.sizeDM}]`
-                }
-                if (t.facing) {
-                    text += ` - ${game.i18n.localize("MGT2.Vehicle.Face." + t.facing)}`;
-                }
-                if (this.isMelee) {
-                    if (t.distance < 6) {
-                        eligibleTargets.push(t);
-                        context.TARGET_SELECT[t.token.document._id] = text;
-                    }
-                } else {
-                    t.rangeDM = this._getRangeDM(t);
-                    if (t.rangeDM) {
-                        text += ` [${t.rangeDM}]`;
-                    }
-                    if (parseInt(t.rangeDM) > -99) {
-                        eligibleTargets.push(t);
-                        context.TARGET_SELECT[t.token.document._id] = text;
-                    }
-                }
+            let built = this._buildEligibleTargets(rawTargets);
+            let selected = rebindTargetById(built.targets, currentTargetId);
+            const reboundTargetId = selected?.token?.document?._id;
+            const resetActions = resetAimingForTargetChange(this.aimingActions, currentTargetId, reboundTargetId);
+            if (resetActions !== this.aimingActions) {
+                this.aimingActions = resetActions;
+                built = this._buildEligibleTargets(rawTargets);
+                selected = rebindTargetById(built.targets, currentTargetId);
             }
-            this.TARGETS = eligibleTargets;
-            context.TARGETS = eligibleTargets;
-            this.currentTarget = rebindTargetById(eligibleTargets, currentTargetId);
-            const reboundTargetId = this.currentTarget?.token?.document?._id;
-            this.aimingActions = resetAimingForTargetChange(this.aimingActions, currentTargetId, reboundTargetId);
+            this.TARGETS = built.targets;
+            context.TARGETS = built.targets;
+            context.TARGET_SELECT = built.select;
+            this.currentTarget = selected;
             if (this.currentTarget) this.currentTargetId = this.currentTarget.token.document._id;
         } else {
             this.TARGETS = [];
@@ -354,7 +354,10 @@ export class MgT2eAttackApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return null;
         }
         const rangeDM = manualRangeDM ?? resolveRangeDM(undefined, this.currentTarget?.rangeDM);
-        const aimingActions = this.isMelee || !this.actor ? 0 : parseAimingActions(formData.object.aimingActions);
+        const canAim = !this.isMelee
+            && this.weaponItem?.system?.weapon?.scale !== "spacecraft"
+            && isCharacterAimingActor(this.actor);
+        const aimingActions = canAim ? parseAimingActions(formData.object.aimingActions) : 0;
         if (aimingActions === null) {
             ui.notifications.warn("Aiming actions must be a whole number from 0 to 6.");
             return null;
