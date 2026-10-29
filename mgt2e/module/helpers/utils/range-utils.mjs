@@ -30,6 +30,13 @@ export function getWeaponRangeBands(rangeValue, scale) {
     };
 }
 
+export function renderWeaponRangeTable(weapon, localize = key => key) {
+    const bands = getWeaponRangeBands(weapon?.range, weapon?.scale);
+    const {short, medium, long, extreme} = bands.display;
+    return `<table><tr><th>${localize("MGT2.Attack.short")} (+1)</th><th>${localize("MGT2.Attack.medium")}</th><th>${localize("MGT2.Attack.long")} (-2)</th><th>${localize("MGT2.Attack.extreme")} (-4)</th></tr>` +
+        `<tr><td>${short}${bands.unit}</td><td>${medium}${bands.unit}</td><td>${long}${bands.unit}</td><td>${extreme}${bands.unit}</td></tr></table>`;
+}
+
 export function getTargetRangeBand(targetDistanceMetres, bands, {aimed = false, hasScope = false} = {}) {
     const distance = distanceToMetres(targetDistanceMetres);
     if (distance === null || !bands || bands.metres.extreme <= 0 || distance > bands.metres.extreme) return {band: "outOfRange", dm: -99};

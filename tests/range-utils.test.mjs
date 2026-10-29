@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     distanceToMetres, formatRangeDMOption, getRangeBandDistance, getTargetRangeBand,
-    getWeaponRangeBands, normaliseWeaponRange, resolveRangeDM
+    getWeaponRangeBands, normaliseWeaponRange, renderWeaponRangeTable, resolveRangeDM
 } from "../mgt2e/module/helpers/utils/range-utils.mjs";
 
 const cases = [
@@ -34,3 +34,8 @@ const cases = [
 ];
 
 for (const [name, assertion] of cases) test(name, assertion);
+
+test("Vehicle Sheet 2 weapon range table preserves fractional kilometre labels", () => {
+    const html = renderWeaponRangeTable({range: 2.5, scale: "vehicle"});
+    assert.match(html, /<td>0\.625km<\/td><td>2\.5km<\/td><td>5km<\/td><td>10km<\/td>/);
+});

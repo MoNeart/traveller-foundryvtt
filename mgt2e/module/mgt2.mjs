@@ -44,7 +44,7 @@ import {
     launchSwarmHandler, showSwarmHandler
 } from "./helpers/spacecraft/spacecraft-utils.mjs";
 import {onManageActiveEffect} from "./helpers/effects.mjs";
-import {getWeaponRangeBands, getWeaponRangeUnit} from "./helpers/utils/range-utils.mjs";
+import {getWeaponRangeBands, getWeaponRangeUnit, renderWeaponRangeTable} from "./helpers/utils/range-utils.mjs";
 const  { renderTemplate } = foundry.applications.handlebars;
 
 const { Actors, Items } = foundry.documents.collections;
@@ -2984,13 +2984,7 @@ Handlebars.registerHelper("weaponMountBlock", function(mount) {
         if (system.weapon.scale === "spacecraft") {
             html += `${game.i18n.localize("MGT2.Spacecraft.Range." + system.weapon.spaceRange)}`;
         } else {
-            const shortRange = parseInt(system.weapon.range / 4);
-            const longRange = parseInt(system.weapon.range * 2);
-            const extremeRange = parseInt(system.weapon.range * 4);
-            const unit = (system.weapon.scale === "vehicle")?"km":"m";
-            html += `<table><tr><th>${game.i18n.localize("MGT2.Attack.short")} (+1)</th><th>${game.i18n.localize("MGT2.Attack.medium")}</th><th>${game.i18n.localize("MGT2.Attack.long")} (-2)</th><th>${game.i18n.localize("MGT2.Attack.extreme")} (-4)</th></tr>`;
-            html += `<tr><td>${shortRange}${unit}</td><td>${system.weapon.range}${unit}</td><td>${longRange}${unit}</td><td>${extremeRange}${unit}</td></tr>`;
-            html += "</table>";
+            html += renderWeaponRangeTable(system.weapon, key => game.i18n.localize(key));
         }
 
         // Can anyone make an attack? Need to look at crew roles.
